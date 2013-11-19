@@ -1,0 +1,10 @@
+
+<ivy-module version="2.0">
+	<info organisation="kairosd.org" module="kairosdb-announce"/>
+	<configurations defaultconf="default" > <!-- defaultconfmapping="runtime->*" -->
+		<conf name="default"/>
+	</configurations>
+	<dependencies>
+
+	</dependencies>
+</ivy-module>
