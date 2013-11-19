@@ -135,14 +135,11 @@ libFileSets = [
 scriptsFileSet = new RegExFileSet("src/scripts", ".*").addExcludeFile("kairosdb-env.sh")
 webrootFileSet = new RegExFileSet("webroot", ".*").recurse()
 
-zipLibDir = "$programName/lib"
-zipBinDir = "$programName/bin"
-zipConfDir = "$programName/conf"
-zipConfLoggingDir = "$zipConfDir/logging"
-zipWebRootDir = "$programName/webroot"
+zipLibDir = "lib"
+zipConfDir = "conf"
 tarRule = new TarRule("build/${programName}-${version}.tar")
 		.addDepend(jp.getJarRule())
-		.addFile("src/main/resources", "kairosdb-announce.properties")
+		.addFileTo(zipConfDir, "src/main/resources", "kairosdb-announce.properties")
 
 for (AbstractFileSet fs in libFileSets)
 	tarRule.addFileSetTo(zipLibDir, fs)
@@ -183,7 +180,7 @@ def doRPM(Rule rule)
 				setPlatform(Architecture.NOARCH, Os.LINUX)
 				summary = summary
 				type = RpmType.BINARY
-				url = "http://code.google.com/p/kairosdb/"
+				url = "https://github.com/proofpoint/kairos-announce"
 				vendor = "Proofpoint Inc."
 				provides = programName
 				//prefixes = rpmBaseInstallDir
@@ -192,26 +189,17 @@ def doRPM(Rule rule)
 			}
 
 	if ("on".equals(rule.getProperty("dependency")))
-		rpmBuilder.addDependencyMore("jre", "1.6")
+		rpmBuilder.addDependencyMore("kairosdb", "0.9.3")
 
-	rpmBuilder.setPostInstallScript(new File("src/scripts/install/post_install.sh"))
-	rpmBuilder.setPreUninstallScript(new File("src/scripts/install/pre_uninstall.sh"))
+	//rpmBuilder.setPostInstallScript(new File("src/scripts/install/post_install.sh"))
+	//rpmBuilder.setPreUninstallScript(new File("src/scripts/install/pre_uninstall.sh"))
 
 	for (AbstractFileSet fs in libFileSets)
 		addFileSetToRPM(rpmBuilder, "$rpmBaseInstallDir/lib", fs)
 
-	addFileSetToRPM(rpmBuilder, "$rpmBaseInstallDir/bin", scriptsFileSet)
-
-	rpmBuilder.addFile("/etc/init.d/kairosdb", new File("src/scripts/kairosdb-service.sh"), 0755)
-	rpmBuilder.addFile("$rpmBaseInstallDir/conf/kairosdb.properties",
-			new File("src/main/resources/kairosdb.properties"), 0644, new Directive(Directive.RPMFILE_CONFIG | Directive.RPMFILE_NOREPLACE))
-	rpmBuilder.addFile("$rpmBaseInstallDir/conf/logging/logback.xml",
-			new File("src/main/resources/logback.xml"), 0644, new Directive(Directive.RPMFILE_CONFIG | Directive.RPMFILE_NOREPLACE))
-	rpmBuilder.addFile("$rpmBaseInstallDir/bin/kairosdb-env.sh",
-			new File("src/scripts/kairosdb-env.sh"), 0755, new Directive(Directive.RPMFILE_CONFIG | Directive.RPMFILE_NOREPLACE))
-
-	for (AbstractFileSet.File f : webrootFileSet.getFiles())
-		rpmBuilder.addFile("$rpmBaseInstallDir/webroot/$f.file", new File(f.getBaseDir(), f.getFile()))
+	rpmBuilder.addFile("$rpmBaseInstallDir/conf/kairosdb-announce.properties",
+			new File("src/main/resources/kairosdb-announce.properties"), 0644,
+			new Directive(Directive.RPMFILE_CONFIG | Directive.RPMFILE_NOREPLACE))
 
 	println("Building RPM "+rule.getTarget())
 	outputFile = new FileOutputStream(rule.getTarget())
