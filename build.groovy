@@ -28,7 +28,7 @@ saw.setProperty(Tablesaw.PROP_MULTI_THREAD_OUTPUT, Tablesaw.PROP_VALUE_ON)
 programName = "kairosdb-announce"
 //Do not use '-' in version string, it breaks rpm uninstall.
 version = "1.0"
-release = "1" //package release number
+release = "3" //package release number
 summary = "KairosDB Announce"
 description = """\
 KairosDB-Announce is a KairosDB plugin to announce to platform.
@@ -62,7 +62,7 @@ jp = new JavaProgram().setProgramName(programName)
 jp.getCompileRule().getDefinition().set("target", "1.6")
 jp.getCompileRule().getDefinition().set("source", "1.6")
 
-//jp.getJarRule().addFiles("src/main/resources", "kairosdb.properties")
+jp.getJarRule().addFiles("src/main/resources", "kairosdb-announce.properties")
 
 //Set information in the manifest file
 manifest = jp.getJarRule().getManifest().getMainAttributes()

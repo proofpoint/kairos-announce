@@ -18,7 +18,6 @@ package org.kairosdb.plugin.announce;
 
 import com.google.inject.name.Named;
 import org.apache.http.HttpResponse;
-import org.apache.http.client.ClientProtocolException;
 import org.apache.http.client.HttpClient;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpPut;
@@ -34,28 +33,26 @@ import org.slf4j.LoggerFactory;
 
 import javax.inject.Inject;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-/**
- Created with IntelliJ IDEA.
- User: bhawkins
- Date: 11/6/13
- Time: 10:04 AM
- To change this template use File | Settings | File Templates.
- */
 public class AnnounceService implements KairosDBService
 {
 	public static final Logger logger = LoggerFactory.getLogger(AnnounceService.class);
 
 	private UUID m_announceId = UUID.randomUUID();
 	private String m_nodeId = "312d61f9-0784-41e3-8c37-b9142b20b791";
-	private final String m_discoveryUrl;
 	private final String m_environment;
 	private final String m_pool;
 	private final ScheduledExecutorService m_executorService;
+	private final List<String> m_discoveryUrls;
+
+	private boolean announced = false;
+	private boolean logMessages = false;
 
 	@Inject
 	@Named("HOSTNAME")
@@ -74,83 +71,72 @@ public class AnnounceService implements KairosDBService
 	private int m_httpPort = 8080;
 
 	@Inject
-	@Named("kairosdb.plugin.announce.retry")
-	private int m_retry = 5;
+	@Named("kairosdb.plugin.announce.period")
+	private int announcePeriod = 5;
+
 
 	@Inject
-	public AnnounceService(@Named("kairosdb.plugin.announce.discovery.url")String discoveryUrl,
-			@Named("kairosdb.plugin.announce.environment")String environment,
-			@Named("kairosdb.plugin.announce.pool")String pool)
+	public AnnounceService(@Named("kairosdb.plugin.announce.discovery.hosts") String discoveryHosts,
+	                       @Named("kairosdb.plugin.announce.discovery.port") int discoveryPort,
+	                       @Named("kairosdb.plugin.announce.environment") String environment,
+	                       @Named("kairosdb.plugin.announce.pool") String pool)
 	{
-		m_discoveryUrl = discoveryUrl;
 		m_environment = environment;
 		m_pool = pool;
+
+		m_discoveryUrls = new ArrayList<String>();
+
+		String[] hosts = discoveryHosts.split(",");
+		for (String host : hosts)
+		{
+			host = host.trim();
+			m_discoveryUrls.add("http://" + host + ":" + discoveryPort);
+		}
 
 		m_executorService = Executors.newSingleThreadScheduledExecutor();
 	}
 
 	/**
-	 Announces service
-	 @return true if announce succeeded false otherwise.
+	 * Announces service
+	 *
+	 * @return true if announce succeeded false otherwise.
 	 */
-	private boolean announce()
+	private boolean announce(String discoveryURL) throws JSONException, IOException
 	{
 		boolean ret = false;
 
 		JSONObject announce = new JSONObject();
-		try
-		{
-			HttpClient client = new DefaultHttpClient();
+		HttpClient client = new DefaultHttpClient();
 
-			//announce.put("nodeId", m_nodeId);
-			announce.put("environment", m_environment);
-			announce.put("pool", m_pool);
-			announce.put("location", "/"+m_nodeId);
+		announce.put("environment", m_environment);
+		announce.put("pool", m_pool);
+		announce.put("location", "/" + m_nodeId);
 
-			JSONArray services = new JSONArray();
-			announce.put("services", services);
+		JSONArray services = new JSONArray();
+		announce.put("services", services);
 
-			JSONObject service = new JSONObject();
-			services.put(service);
+		JSONObject service = new JSONObject();
+		services.put(service);
 
-			service.put("id", m_announceId.toString());
-			service.put("type", "pulse-kairos");
+		service.put("id", m_announceId.toString());
+		service.put("type", "pulse-kairos");
 
-			JSONObject props = new JSONObject();
-			props.put("http", "http://"+m_hostIp+":"+m_httpPort);
-			props.put("http-external", "http://"+ m_hostName +":"+m_httpPort);
-			props.put("telnet", m_hostIp+":"+m_telnetPort);
+		JSONObject props = new JSONObject();
+		props.put("http", "http://" + m_hostIp + ":" + m_httpPort);
+		props.put("http-external", "http://" + m_hostName + ":" + m_httpPort);
+		props.put("telnet", m_hostIp + ":" + m_telnetPort);
 
-			service.put("properties", props);
+		service.put("properties", props);
 
-			System.out.println(announce.toString());
-			HttpPut post = new HttpPut(m_discoveryUrl+"/v1/announcement/"+m_nodeId);
-			post.setHeader("User-Agent", m_nodeId);
-			post.setHeader("Content-Type", "application/json");
+		HttpPut post = new HttpPut(discoveryURL + "/v1/announcement/" + m_nodeId);
+		post.setHeader("User-Agent", m_nodeId);
+		post.setHeader("Content-Type", "application/json");
 
-			post.setEntity(new StringEntity(announce.toString()));
+		post.setEntity(new StringEntity(announce.toString()));
 
-			HttpResponse response = client.execute(post);
-			if (response.getStatusLine().getStatusCode() == 202)
-			{
-				ret = true;
-				logger.info("Announce to Discovery Server ("+m_discoveryUrl+") Succeeded.");
-			}
-			else
-				logger.warn("Announce to Discovery Server (" + m_discoveryUrl + ") Failed.");
-		}
-		catch (JSONException e)
-		{
-			logger.warn("Failed to announce", e);
-		}
-		catch (ClientProtocolException e)
-		{
-			logger.warn("Failed to announce", e);
-		}
-		catch (IOException e)
-		{
-			logger.warn("Failed to announce", e);
-		}
+		HttpResponse response = client.execute(post);
+		if (response.getStatusLine().getStatusCode() == 202)
+			ret = true;
 
 		return (ret);
 	}
@@ -158,11 +144,7 @@ public class AnnounceService implements KairosDBService
 	@Override
 	public void start() throws KairosDBException
 	{
-		if (!announce())
-		{
-			//Start announce thread to keep trying
-			m_executorService.schedule(new AnnounceTask(), m_retry, TimeUnit.MINUTES);
-		}
+		m_executorService.scheduleAtFixedRate(new AnnounceTask(), 0, announcePeriod, TimeUnit.SECONDS);
 	}
 
 	@Override
@@ -172,14 +154,18 @@ public class AnnounceService implements KairosDBService
 		{
 			m_executorService.shutdown();
 			HttpClient client = new DefaultHttpClient();
-			HttpDelete delete = new HttpDelete(m_discoveryUrl+"/v1/announcement/"+m_nodeId);
-			delete.setHeader("User-Agent", m_nodeId);
-			HttpResponse response = client.execute(delete);
-			logger.info("De-Announce status: "+response.getStatusLine().getStatusCode());
+
+			for (String url : m_discoveryUrls)
+			{
+				HttpDelete delete = new HttpDelete(url + "/v1/announcement/" + m_nodeId);
+				delete.setHeader("User-Agent", m_nodeId);
+				HttpResponse response = client.execute(delete);
+				logger.info("Announcement repeal status: " + response.getStatusLine().getStatusCode());
+			}
 		}
 		catch (IOException e)
 		{
-			logger.warn("Failed to de-announce", e);
+			logger.warn("Failed to repeal announcement", e);
 		}
 	}
 
@@ -188,8 +174,91 @@ public class AnnounceService implements KairosDBService
 		@Override
 		public void run()
 		{
-			if (!announce())
-				m_executorService.schedule(new AnnounceTask(), m_retry, TimeUnit.MINUTES);
+			List<Message> messages = new ArrayList<Message>();
+			boolean success = false;
+			for (String url : m_discoveryUrls)
+			{
+				try
+				{
+					success = announce(url);
+					if (success)
+					{
+						messages.add(new Message(Level.INFO, "Announce to Discovery Server (" + url + ") Succeeded."));
+						break;
+					}
+					else
+					{
+						messages.add(new Message(Level.WARN, "Announce to Discovery Server (" + url + ") Failed."));
+					}
+				}
+				catch (JSONException e)
+				{
+					messages.add(new Message(Level.WARN, "Failed to announce", e));
+				}
+				catch (IOException e)
+				{
+					messages.add(new Message(Level.WARN, "Failed to announce", e));
+				}
+			}
+			setAnnounceState(success);
+
+			if (logMessages)
+			{
+				for (Message message : messages)
+				{
+				 	message.logMessage();
+				}
+			}
+		}
+	}
+
+	private void setAnnounceState(boolean state)
+	{
+		logMessages = announced != state;
+		announced = state;
+	}
+
+	private enum Level
+	{
+		INFO, WARN
+	}
+
+	private class Message
+	{
+		private Level level;
+		private String message;
+		private Exception exception;
+
+
+		public Message(Level level, String message)
+		{
+			this.level = level;
+			this.message = message;
+		}
+
+		public Message(Level level, String message, Exception exception)
+		{
+			this.level = level;
+			this.message = message;
+			this.exception = exception;
+		}
+
+		public void logMessage()
+		{
+			if (level == Level.WARN)
+			{
+				if (exception != null)
+					logger.warn(message, exception);
+				else
+					logger.warn(message);
+			}
+			else
+			{
+				if (exception != null)
+					logger.info(message, exception);
+				else
+					logger.info(message);
+			}
 		}
 	}
 }
