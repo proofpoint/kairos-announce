@@ -119,7 +119,7 @@ public class AnnounceService implements KairosDBService
 		services.put(service);
 
 		service.put("id", m_announceId.toString());
-		service.put("type", "pulse-kairos");
+		service.put("type", "reporting");
 
 		JSONObject props = new JSONObject();
 		props.put("http", "http://" + m_hostIp + ":" + m_httpPort);
