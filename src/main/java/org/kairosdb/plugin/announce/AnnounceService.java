@@ -45,7 +45,7 @@ public class AnnounceService implements KairosDBService
 	public static final Logger logger = LoggerFactory.getLogger(AnnounceService.class);
 
 	private UUID m_announceId = UUID.randomUUID();
-	private String m_nodeId = "312d61f9-0784-41e3-8c37-b9142b20b791";
+	private UUID m_nodeId = UUID.randomUUID();
 	private final String m_environment;
 	private final String m_pool;
 	private final ScheduledExecutorService m_executorService;
@@ -53,10 +53,7 @@ public class AnnounceService implements KairosDBService
 
 	private boolean announced = false;
 	private boolean logMessages = false;
-
-	@Inject
-	@Named("HOSTNAME")
-	private String m_hostName = "localhost";
+	private boolean firstRun = true;
 
 	@Inject
 	@Named("HOST_IP")
@@ -98,13 +95,9 @@ public class AnnounceService implements KairosDBService
 
 	/**
 	 * Announces service
-	 *
-	 * @return true if announce succeeded false otherwise.
 	 */
-	private boolean announce(String discoveryURL) throws JSONException, IOException
+	private HttpResponse announce(String discoveryURL) throws JSONException, IOException
 	{
-		boolean ret = false;
-
 		JSONObject announce = new JSONObject();
 		HttpClient client = new DefaultHttpClient();
 
@@ -128,16 +121,12 @@ public class AnnounceService implements KairosDBService
 		service.put("properties", props);
 
 		HttpPut post = new HttpPut(discoveryURL + "/v1/announcement/" + m_nodeId);
-		post.setHeader("User-Agent", m_nodeId);
+		post.setHeader("User-Agent", m_nodeId.toString());
 		post.setHeader("Content-Type", "application/json");
 
 		post.setEntity(new StringEntity(announce.toString()));
 
-		HttpResponse response = client.execute(post);
-		if (response.getStatusLine().getStatusCode() == 202)
-			ret = true;
-
-		return (ret);
+		return client.execute(post);
 	}
 
 	@Override
@@ -157,7 +146,7 @@ public class AnnounceService implements KairosDBService
 			for (String url : m_discoveryUrls)
 			{
 				HttpDelete delete = new HttpDelete(url + "/v1/announcement/" + m_nodeId);
-				delete.setHeader("User-Agent", m_nodeId);
+				delete.setHeader("User-Agent", m_nodeId.toString());
 				HttpResponse response = client.execute(delete);
 				logger.info("Announcement repeal status: " + response.getStatusLine().getStatusCode());
 			}
@@ -179,7 +168,10 @@ public class AnnounceService implements KairosDBService
 			{
 				try
 				{
-					success = announce(url);
+					HttpResponse response = announce(url);
+					if (response.getStatusLine().getStatusCode() == 202)
+						success = true;
+
 					if (success)
 					{
 						messages.add(new Message(Level.INFO, "Announce to Discovery Server (" + url + ") Succeeded."));
@@ -187,7 +179,7 @@ public class AnnounceService implements KairosDBService
 					}
 					else
 					{
-						messages.add(new Message(Level.WARN, "Announce to Discovery Server (" + url + ") Failed."));
+						messages.add(new Message(Level.WARN, "Announce to Discovery Server (" + url + ") Failed with response code " + response.getStatusLine().getStatusCode()));
 					}
 				}
 				catch (JSONException e)
@@ -205,15 +197,16 @@ public class AnnounceService implements KairosDBService
 			{
 				for (Message message : messages)
 				{
-				 	message.logMessage();
+					message.logMessage();
 				}
 			}
+			firstRun = false;
 		}
 	}
 
 	private void setAnnounceState(boolean state)
 	{
-		logMessages = announced != state;
+		logMessages = firstRun || announced != state; // Always log messages the first time
 		announced = state;
 	}
 
