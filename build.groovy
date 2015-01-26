@@ -48,21 +48,15 @@ rpmNoDepDirRule = new DirectoryRule(rpmNoDepDir)
 
 ivy = new IvyAddon().setup()
 
-kairosLib = saw.getProperty("KAIROS")
-if (kairosLib == null)
-	throw new TablesawException("You must set the 'KAIROS' property to point to a deployed KairosDB instance.")
-
-buildLibraries = new RegExFileSet(kairosLib+"/lib", ".*\\.jar")
-		.getFullFilePaths()
-
 jp = new JavaProgram().setProgramName(programName)
-		.setLibraryJars(buildLibraries)
 		.setup()
-
 jp.getCompileRule().getDefinition().set("target", "1.6")
 jp.getCompileRule().getDefinition().set("source", "1.6")
 
 jp.getJarRule().addFiles("src/main/resources", "kairosdb-announce.properties")
+
+jc = jp.getCompileRule()
+jc.addDepend(ivy.getResolveRule("default"))
 
 //Set information in the manifest file
 manifest = jp.getJarRule().getManifest().getMainAttributes()
