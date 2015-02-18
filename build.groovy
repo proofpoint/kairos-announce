@@ -27,8 +27,8 @@ saw.setProperty(Tablesaw.PROP_MULTI_THREAD_OUTPUT, Tablesaw.PROP_VALUE_ON)
 
 programName = "kairosdb-announce"
 //Do not use '-' in version string, it breaks rpm uninstall.
-version = saw.getProperty('VERSION_NUMBER') || "1.0";
-release = saw.getProperty('BUILD_NUMBER') || '3'; //package release number
+version = saw.getProperty("VERSION_NUMBER") ?: "1.0";
+release = saw.getProperty("BUILD_NUMBER") ?: "3"; //package release number
 summary = "KairosDB Announce"
 description = """\
 KairosDB-Announce is a KairosDB plugin to announce to platform.
