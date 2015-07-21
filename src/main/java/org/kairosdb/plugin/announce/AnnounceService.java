@@ -68,6 +68,10 @@ public class AnnounceService implements KairosDBService
 	private int m_httpPort = 8080;
 
 	@Inject
+	@Named("kairosdb.jetty.ssl.port")
+	private int m_httpsPort = 0;
+
+	@Inject
 	@Named("kairosdb.plugin.announce.period")
 	private int announcePeriod = 5;
 
@@ -115,8 +119,13 @@ public class AnnounceService implements KairosDBService
 		service.put("type", "reporting");
 
 		JSONObject props = new JSONObject();
-		props.put("http", "http://" + m_hostIp + ":" + m_httpPort);
-		props.put("telnet", m_hostIp + ":" + m_telnetPort);
+
+		if (m_httpPort > 0)
+			props.put("http", "http://" + m_hostIp + ":" + m_httpPort);
+		if (m_httpsPort > 0)
+			props.put("https", "https://" + m_hostIp + ":" + m_httpsPort);
+		if (m_telnetPort > 0)
+			props.put("telnet", m_hostIp + ":" + m_telnetPort);
 
 		service.put("properties", props);
 
