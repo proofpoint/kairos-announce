@@ -60,6 +60,10 @@ public class AnnounceService implements KairosDBService
 	private String m_hostIp = "127.0.0.1";
 
 	@Inject
+	@Named("HOSTNAME")
+	private String m_hostname = "localhost";
+
+	@Inject
 	@Named("kairosdb.telnetserver.port")
 	private int m_telnetPort = 4242;
 
@@ -121,11 +125,11 @@ public class AnnounceService implements KairosDBService
 		JSONObject props = new JSONObject();
 
 		if (m_httpPort > 0)
-			props.put("http", "http://" + m_hostIp + ":" + m_httpPort);
+			props.put("http", "http://" + m_hostname + ":" + m_httpPort);
 		if (m_httpsPort > 0)
-			props.put("https", "https://" + m_hostIp + ":" + m_httpsPort);
+			props.put("https", "https://" + m_hostname + ":" + m_httpsPort);
 		if (m_telnetPort > 0)
-			props.put("telnet", m_hostIp + ":" + m_telnetPort);
+			props.put("telnet", m_hostname + ":" + m_telnetPort);
 
 		service.put("properties", props);
 
