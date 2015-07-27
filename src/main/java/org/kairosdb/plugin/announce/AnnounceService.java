@@ -125,11 +125,11 @@ public class AnnounceService implements KairosDBService
 		JSONObject props = new JSONObject();
 
 		if (m_httpPort > 0)
-			props.put("http", "http://" + m_hostname + ":" + m_httpPort);
+			props.put("http", "http://" + m_hostIp + ":" + m_httpPort);
 		if (m_httpsPort > 0)
 			props.put("https", "https://" + m_hostname + ":" + m_httpsPort);
 		if (m_telnetPort > 0)
-			props.put("telnet", m_hostname + ":" + m_telnetPort);
+			props.put("telnet", m_hostIp + ":" + m_telnetPort);
 
 		service.put("properties", props);
 
